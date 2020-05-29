@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.3.xsd">
+		
+		<!-- shiro为集成springMvc 拦截异常 -->
+	<bean
+		class="org.springframework.web.servlet.handler.SimpleMappingExceptionResolver">
+		<property name="exceptionMappings">
+			<props>
+				<!-- 没有权限异常跳转的页面 
+					如果springMVC配置了 视图解析的前后缀，那么必须按照视图解析的位置配置 页面
+				-->
+				<!-- <prop key="org.apache.shiro.authz.UnauthorizedException">unauthorized</prop> -->
+				<prop key="org.apache.shiro.authz.UnauthorizedException">unauthorized</prop>
+			</props>
+		</property>
+	</bean>
+	
+	<!-- 开启aop，Shiro框架好使用AOP创建控制器代理对象-->
+	<aop:config proxy-target-class="true"></aop:config>
+	<!-- 开启shiro的注解支持 -->
+	<bean class="org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor">
+		<!-- 注入安全管理器 -->
+		<property name="securityManager" ref="securityManager"></property>
+	</bean>
+		
+		
+		<!-- 配置自定义退出登录过滤器 -->
+		<bean id="myLogoutFilter" class="cn.youyu.logistics.shiro.MyLogoutFilter">
+			<!-- 配置退出登录以后重定向跳转的地址，默认 是根路径/ -->
+			<property name="redirectUrl" value="/login.jsp"/>
+		</bean>
+		<!-- 自定义表单认证过滤器 -->
+		<bean id="myFormAuthenticationFilter" class="cn.youyu.logistics.shiro.MyFormAuthenticationFilter"/>
+		
+		
+		<!-- 配置Shiro 框架 -->
+		<bean id="shiroFilter" class="org.apache.shiro.spring.web.ShiroFilterFactoryBean">
+			<!-- 定义过滤器链 -->
+			<property name="filters">
+				<map>
+					<entry key="logout" value-ref="myLogoutFilter"/>
+					<entry key="authc" value-ref="myFormAuthenticationFilter"/>
+				</map>
+			</property>
+			<!-- 配置安全管理器 -->
+			<property name="securityManager" ref="securityManager"/>
+			<!-- 认证成功页面 -->
+			<property name="successUrl" value="/index.do"/>
+			<!-- 认证失败页面,没有认证强制访问需要认证的页面自动跳转的页面 -->
+			<property name="loginUrl" value="/admin/login.do"/>
+			<!-- 没有权限访问的页面 ，只对xml配置权限有效，对注解配置权限需要重新配置 -->
+		<!-- <property name="unauthorizedUrl" value="/unauthorized.jsp"/> -->
+			<!-- 配置过滤器链 -->
+			<property name="filterChainDefinitions">
+				<value>
+					/lib/**=anon
+					/static/**=anon
+					/login.jsp=anon
+					/verifyCode.jsp=anon
+					/logout.do=logout
+					/index.do=user
+					/**=authc
+				</value>
+			</property>
+		</bean>
+		
+		<!-- 配置安全管理器 -->
+		<bean id="securityManager" class="org.apache.shiro.web.mgt.DefaultWebSecurityManager">
+			<!-- 自定义Realm -->
+			<property name="realm" ref="myCustomRealm"/>
+			<!-- 缓存管理器 -->
+			<property name="cacheManager" >
+				<bean class="org.apache.shiro.cache.ehcache.EhCacheManager">
+					<property name="cacheManagerConfigFile" value="classpath:ehcache-shiro.xml"/>
+				</bean>
+			</property>
+			<!-- 会话管理 -->
+			<property name="sessionManager" ref="sessionManager"/>
+			<!-- 记住我 -->
+			<property name="rememberMeManager">
+				<bean class="org.apache.shiro.web.mgt.CookieRememberMeManager">
+					<property name="cookie">
+						<bean class="org.apache.shiro.web.servlet.SimpleCookie">
+							<constructor-arg value="rememberMe"/>
+							<property name="maxAge" value="#{3600*24*3}"/>
+						</bean>				
+					</property>
+				</bean>
+			</property>
+		</bean>
+		
+		<!-- 配置会话管理器 -->
+		<bean id="sessionManager" class="org.apache.shiro.web.session.mgt.DefaultWebSessionManager">
+			<property name="deleteInvalidSessions" value="true"/>
+			<property name="globalSessionTimeout" value="#{1000*3600}"/>
+		</bean>
+		
+		<!-- 配置自定义Realm -->
+		<bean id="myCustomRealm" class="cn.youyu.logistics.shiro.CustomRealm">
+			<property name="credentialsMatcher" ref="credentialsMatcher"/>
+		</bean>
+		<!-- 凭证匹配器 -->
+		<bean id="credentialsMatcher" class="org.apache.shiro.authc.credential.HashedCredentialsMatcher">
+			<property name="hashAlgorithmName" value="MD5"/>
+			<property name="hashIterations" value="3"/>
+		</bean>
+</beans>
